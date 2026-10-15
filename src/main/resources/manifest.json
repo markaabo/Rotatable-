@@ -1,7 +1,7 @@
 {
     "Group": "markaabo",
     "Name": "rotatable",
-    "Version": "0.0.3",
+    "Version": "0.0.4",
     "Description": "Adds the option to rotate blocks in survival!",
     "Authors": [
         {
@@ -10,7 +10,7 @@
     ],
     "Website": "",
     "DisabledByDefault": false,
-    "IncludesAssetPack": true,
+    "IncludesAssetPack": false,
     "Dependencies": {
         "Hytale:AssetModule": "*"
     },

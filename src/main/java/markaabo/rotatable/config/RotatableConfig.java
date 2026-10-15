@@ -17,6 +17,10 @@ public class RotatableConfig {
                     (config, value) -> config.autoDetectModdedBlocks = value,
                     config -> config.autoDetectModdedBlocks)
             .add()
+            .append(new KeyedCodec<String>("RotationVariant", Codec.STRING),
+                    (config, value) -> config.rotationVariant = value,
+                    config -> config.rotationVariant)
+            .add()
             .append(new KeyedCodec<String>("PlacementRotationMode", Codec.STRING),
                     (config, value) -> config.placementRotationMode = value,
                     config -> config.placementRotationMode)
@@ -33,7 +37,8 @@ public class RotatableConfig {
 
     private boolean autoDetectFullBlocks = true;
     private boolean autoDetectModdedBlocks = false;
-    private String placementRotationMode = "BlockNormal";
+    private String rotationVariant = "NESW";
+    private String placementRotationMode = "Keep";
     private String[] includedBlocks = new String[0];
     private String[] blacklistedBlocks = new String[0];
 
@@ -43,6 +48,10 @@ public class RotatableConfig {
 
     public boolean isAutoDetectModdedBlocks() {
         return autoDetectModdedBlocks;
+    }
+
+    public String getRotationVariant() {
+        return rotationVariant == null ? "NESW" : rotationVariant;
     }
 
     public String getPlacementRotationMode() {
