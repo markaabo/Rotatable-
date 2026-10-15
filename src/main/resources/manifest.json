@@ -1,7 +1,7 @@
 {
     "Group": "markaabo",
     "Name": "rotatable",
-    "Version": "0.0.2",
+    "Version": "0.0.3",
     "Description": "Adds the option to rotate blocks in survival!",
     "Authors": [
         {

@@ -17,7 +17,7 @@ public class RotatablePlugin extends JavaPlugin {
     @Override
     protected void setup() {
         getCommandRegistry().registerCommand(new RotatableCommand(this, rotationManager));
-        getLogger().atInfo().log("Rotatable loaded!");
+        getLogger().atInfo().log("Rotatable! loaded!");
     }
 
     // Runs after the game's assets (including all block types) have loaded.
@@ -26,7 +26,7 @@ public class RotatablePlugin extends JavaPlugin {
         try {
             rotationManager.reload();
         } catch (Exception e) {
-            getLogger().atSevere().withCause(e).log("Rotatable: could not enable block rotation");
+            getLogger().atSevere().withCause(e).log("Rotatable!: could not enable block rotation");
         }
     }
 }

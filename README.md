@@ -30,19 +30,32 @@ You can modify the mods settings in `mods/rotatable/config.json`
 
 #### Default Configuration:
 
-`{
-"TEMP"
-}`
+```
+{
+  "AutoDetectFullBlocks": true,
+  "AutoDetectModdedBlocks": false,
+  "PlacementRotationMode": "BlockNormal",
+  "IncludedBlocks": [],
+  "BlacklistedBlocks": []
+}
+```
 
 #### Example Configuration:
 
-`{
-"TEMP"
-}`
+```
+{
+  "AutoDetectFullBlocks": true,
+  "AutoDetectModdedBlocks": false,
+  "PlacementRotationMode": "BlockNormal",
+  "IncludedBlocks": ["Ore_*_Shale"],
+  "BlacklistedBlocks": ["Soil_*", "Rock_Shale_Brick_Ornate"]
+}
+```
 
 ### **Credits**
 
 This project was created with AI. (Sadly we are not all perfect coders)
 
-Created by: Markaabo & Zanodar
-Contributors: Claude.ai
+**Created by:** Markaabo & Zanodar
+
+**Contributors:** Claude.ai

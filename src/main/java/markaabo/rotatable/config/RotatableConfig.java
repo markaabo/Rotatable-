@@ -4,7 +4,7 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 
-/** The settings stored in mods/rotatable/config.json. */
+/** The settings stored in mods/Rotatable!/config.json. */
 public class RotatableConfig {
 
     public static final BuilderCodec<RotatableConfig> CODEC = BuilderCodec
@@ -12,6 +12,14 @@ public class RotatableConfig {
             .append(new KeyedCodec<Boolean>("AutoDetectFullBlocks", Codec.BOOLEAN),
                     (config, value) -> config.autoDetectFullBlocks = value,
                     config -> config.autoDetectFullBlocks)
+            .add()
+            .append(new KeyedCodec<Boolean>("AutoDetectModdedBlocks", Codec.BOOLEAN),
+                    (config, value) -> config.autoDetectModdedBlocks = value,
+                    config -> config.autoDetectModdedBlocks)
+            .add()
+            .append(new KeyedCodec<String>("PlacementRotationMode", Codec.STRING),
+                    (config, value) -> config.placementRotationMode = value,
+                    config -> config.placementRotationMode)
             .add()
             .append(new KeyedCodec<String[]>("IncludedBlocks", Codec.STRING_ARRAY),
                     (config, value) -> config.includedBlocks = value,
@@ -24,11 +32,21 @@ public class RotatableConfig {
             .build();
 
     private boolean autoDetectFullBlocks = true;
+    private boolean autoDetectModdedBlocks = false;
+    private String placementRotationMode = "BlockNormal";
     private String[] includedBlocks = new String[0];
     private String[] blacklistedBlocks = new String[0];
 
     public boolean isAutoDetectFullBlocks() {
         return autoDetectFullBlocks;
+    }
+
+    public boolean isAutoDetectModdedBlocks() {
+        return autoDetectModdedBlocks;
+    }
+
+    public String getPlacementRotationMode() {
+        return placementRotationMode == null ? "Keep" : placementRotationMode;
     }
 
     public String[] getIncludedBlocks() {
