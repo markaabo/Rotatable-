@@ -41,6 +41,8 @@ public final class BlockRotationManager {
     private static final Path CONFIG_DIRECTORY = Path.of("mods", MOD_NAME);
     private static final Path CONFIG_FILE = CONFIG_DIRECTORY.resolve("config.json");
     private static final Path DEBUG_FILE = CONFIG_DIRECTORY.resolve("debug.txt");
+    /** Ids of the blocks Rotatable! has changed. The game can keep our changes across restarts. */
+    private static final Path CHANGED_FILE = CONFIG_DIRECTORY.resolve("changed-blocks.txt");
 
     /** The asset pack of the base game. Blocks from any other pack count as "modded". */
     private static final String BASE_GAME_PACK = "Hytale:Hytale";
@@ -150,9 +152,15 @@ public final class BlockRotationManager {
     private VariantRotation appliedVariant = null;
     private RotationMode appliedMode = null;
     private boolean placementWarningLogged = false;
+    private boolean recordLoaded = false;
 
     private Stats stats = Stats.EMPTY;
     private Report report = Report.EMPTY;
+
+    /** True if Rotatable! has given this block its rotation. */
+    public synchronized boolean isChanged(String id) {
+        return originals.containsKey(id);
+    }
 
     public synchronized Stats getStats() {
         return stats;
@@ -249,6 +257,8 @@ public final class BlockRotationManager {
         List<Pattern> included = toPatterns(settings.getIncludedBlocks());
         List<Pattern> blacklisted = toPatterns(settings.getBlacklistedBlocks());
         var assetMap = BlockType.getAssetMap();
+
+        adoptBlocksFromLastRun();
 
         warnAboutUnknownIds("IncludedBlocks", settings.getIncludedBlocks());
         warnAboutUnknownIds("BlacklistedBlocks", settings.getBlacklistedBlocks());
@@ -380,6 +390,7 @@ public final class BlockRotationManager {
         if (allOk) {
             appliedVariant = variant;
             appliedMode = placementMode;
+            saveChangedRecord();
         }
 
         report = new Report(
@@ -399,6 +410,55 @@ public final class BlockRotationManager {
                         + "%d other-mod blocks skipped)",
                 stats.fullBlocks(), stats.moddedFullBlocks(), stats.rotationAdded(),
                 stats.alreadyRotatable(), stats.builtInIgnored(), stats.blacklisted(), stats.moddedSkipped());
+    }
+
+    /**
+     * The game can keep our changes between restarts, so on a new start some blocks already
+     * have rotation that came from Rotatable!. The record file tells us which ones. We take
+     * them over (original = the same block without rotation) so they are handled like any
+     * other changed block: the placement mode gets applied and they are restored if needed.
+     */
+    private void adoptBlocksFromLastRun() {
+        var assetMap = BlockType.getAssetMap();
+        if (recordLoaded) {
+            return;
+        }
+        recordLoaded = true;
+        if (Files.notExists(CHANGED_FILE)) {
+            return;
+        }
+        try {
+            int adopted = 0;
+            for (String line : Files.readAllLines(CHANGED_FILE, StandardCharsets.UTF_8)) {
+                String id = line.trim();
+                BlockType now = id.isEmpty() ? null : assetMap.getAsset(id);
+                if (now == null || now.getVariantRotation() == VariantRotation.None
+                        || originals.containsKey(id)) {
+                    continue;
+                }
+                BlockType original = now.clone(id);
+                rotationField.set(original, VariantRotation.None);
+                originals.put(id, original);
+                adopted++;
+            }
+            if (adopted > 0) {
+                LOGGER.atInfo().log("Rotatable!: %d blocks still had rotation from the last run, taking them over",
+                        adopted);
+            }
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Rotatable!: could not read the list of changed blocks");
+        }
+    }
+
+    private void saveChangedRecord() {
+        try {
+            Files.createDirectories(CONFIG_DIRECTORY);
+            List<String> ids = new ArrayList<>(originals.keySet());
+            Collections.sort(ids);
+            Files.write(CHANGED_FILE, ids, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            LOGGER.atWarning().withCause(e).log("Rotatable!: could not save the list of changed blocks");
+        }
     }
 
     /** A full block: a solid, full-size cube. Stairs, roofs, slabs, walls etc. are models. */
@@ -486,14 +546,14 @@ public final class BlockRotationManager {
         lines.add("");
         lines.add("Summary");
         lines.add("  Full blocks detected: " + stats.fullBlocks() + " (" + stats.moddedFullBlocks() + " from other mods)");
-        lines.add("  Rotation added: " + stats.rotationAdded());
+        lines.add("  Blocks given rotation by Rotatable!: " + stats.rotationAdded());
         lines.add("  Already rotatable in the base game: " + stats.alreadyRotatable());
         lines.add("  Ignored by the default rules: " + stats.builtInIgnored());
         lines.add("");
 
         // Settings you can change come first, the built-in defaults last.
-        addSection(lines, "Rotation added (auto-detected)", report.auto());
-        addSection(lines, "Rotation added (from IncludedBlocks)", report.included());
+        addSection(lines, "Given rotation by Rotatable!: full blocks found by auto-detect", report.auto());
+        addSection(lines, "Given rotation by Rotatable!: blocks from your IncludedBlocks list", report.included());
         addSection(lines, "Blocked by BlacklistedBlocks", report.blacklisted());
         addSection(lines, "Full blocks from other mods that were NOT changed (AutoDetectModdedBlocks is off)",
                 report.moddedSkipped());
@@ -504,12 +564,13 @@ public final class BlockRotationManager {
                 report.alreadyRotatable());
 
         addPlacementCheck(lines);
+        addComparison(lines, "Rock_Shale_Cobble_Corner", "Rock_Shale_Cobble");
         addVariantReference(lines);
 
         Files.write(DEBUG_FILE, lines, StandardCharsets.UTF_8);
     }
 
-    /** Settings with a (default) or (CHANGED) marker on each line. */
+    /** Settings; only the ones that differ from the default get a (CHANGED) marker. */
     private SettingsView viewSettings() {
         RotatableConfig now = current;
         RotatableConfig defaults = new RotatableConfig();
@@ -534,7 +595,7 @@ public final class BlockRotationManager {
     private static int addSetting(List<String> lines, String name, String value, String defaultValue) {
         boolean same = value.equalsIgnoreCase(defaultValue);
         lines.add("  " + name + ": " + value
-                + (same ? "  (default)" : "  (CHANGED, default: " + defaultValue + ")"));
+                + (same ? "" : "  (CHANGED, default: " + defaultValue + ")"));
         return same ? 0 : 1;
     }
 
@@ -577,6 +638,59 @@ public final class BlockRotationManager {
             }
         }
         lines.add("");
+    }
+
+    /**
+     * Lists every value that differs between two blocks, as sent to players. Used to find out
+     * what a vanilla rotatable block has that our changed blocks do not.
+     */
+    private void addComparison(List<String> lines, String idA, String idB) {
+        lines.add("Comparison: " + idA + " (vanilla rotation) vs " + idB + " (what is sent to players)");
+        try {
+            var assetMap = BlockType.getAssetMap();
+            BlockType a = assetMap.getAsset(idA);
+            BlockType b = assetMap.getAsset(idB);
+            if (a == null || b == null) {
+                lines.add("  one of the blocks was not found");
+                lines.add("");
+                return;
+            }
+            Object packetA = a.toPacket();
+            Object packetB = b.toPacket();
+            int shown = 0;
+            for (Field field : packetA.getClass().getFields()) {
+                if (Modifier.isStatic(field.getModifiers())) {
+                    continue;
+                }
+                String valueA = valueText(field.get(packetA));
+                String valueB = valueText(field.get(packetB));
+                if (!valueA.equals(valueB)) {
+                    lines.add("  " + field.getName() + ": " + valueA + "  |  " + valueB);
+                    shown++;
+                }
+            }
+            if (shown == 0) {
+                lines.add("  no differences");
+            }
+        } catch (Exception e) {
+            lines.add("  comparison failed: " + rootMessage(e));
+        }
+        lines.add("");
+    }
+
+    private static String valueText(Object value) {
+        String text;
+        if (value == null) {
+            text = "null";
+        } else if (value instanceof Object[] array) {
+            text = java.util.Arrays.deepToString(array);
+        } else if (value.getClass().isArray()) {
+            text = value.getClass().getComponentType() == byte.class
+                    ? "bytes[" + ((byte[]) value).length + "]" : "array";
+        } else {
+            text = String.valueOf(value);
+        }
+        return text.length() > 160 ? text.substring(0, 160) + "..." : text;
     }
 
     private String serverPlacementMode(BlockType block) {

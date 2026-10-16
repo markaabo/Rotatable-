@@ -17,11 +17,12 @@ public class RotatableCommand extends AbstractAsyncCommand {
 
     private static final HytaleLogger LOG = HytaleLogger.forEnclosingClass();
     private static final String MOD = BlockRotationManager.MOD_NAME;
-    private static final String SEPARATOR = "----------------------------";
+    private static final String SEPARATOR = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";
 
     private final RotatablePlugin plugin;
 
-    public RotatableCommand(RotatablePlugin plugin, BlockRotationManager manager) {
+    public RotatableCommand(RotatablePlugin plugin, BlockRotationManager manager,
+                            markaabo.rotatable.PlacementHandler trace) {
         super("rotatable", "Shows the " + MOD + " version (subcommands: count, reload, debug)");
         this.plugin = plugin;
         addAliases("ra");
@@ -29,14 +30,15 @@ public class RotatableCommand extends AbstractAsyncCommand {
         addSubCommand(new CountCommand(manager));
         addSubCommand(new ReloadCommand(manager));
         addSubCommand(new DebugCommand(plugin, manager));
+        addSubCommand(new TraceCommand(trace));
     }
 
     @Nonnull
     @Override
     protected CompletableFuture<Void> executeAsync(@Nonnull CommandContext context) {
-        reply(context, MOD + "  v" + version(plugin), List.of(
+        reply(context, MOD + " - v" + version(plugin), List.of(
                 "Commands: count, reload, debug",
-                "Usage: /rotatable <command>  or  /ra <command>"));
+                "Usage: /rotatable <command> or /ra <command>"));
         return CompletableFuture.completedFuture(null);
     }
 
@@ -44,12 +46,12 @@ public class RotatableCommand extends AbstractAsyncCommand {
 
     /** Every command answer is framed by separator lines, with a bold title. */
     private static void reply(CommandContext context, String title, List<String> lines) {
-        context.sendMessage(Message.raw(SEPARATOR));
-        context.sendMessage(Message.raw(title).bold(true));
+        context.sendMessage(Message.raw(SEPARATOR).color("#55AAFF"));
+        context.sendMessage(Message.raw(title).bold(true).color("#FFD166"));
         for (String line : lines) {
             context.sendMessage(Message.raw(line));
         }
-        context.sendMessage(Message.raw(SEPARATOR));
+        context.sendMessage(Message.raw(SEPARATOR).color("#55AAFF"));
     }
 
     private static String version(RotatablePlugin plugin) {
@@ -60,7 +62,7 @@ public class RotatableCommand extends AbstractAsyncCommand {
         List<String> lines = new ArrayList<>();
         lines.add("Full blocks detected: " + stats.fullBlocks()
                 + " (" + stats.moddedFullBlocks() + " from other mods)");
-        lines.add("Rotation added: " + stats.rotationAdded()
+        lines.add("Given rotation by Rotatable!: " + stats.rotationAdded()
                 + " (" + stats.fromIncluded() + " from IncludedBlocks)");
         lines.add("Already rotatable in the base game: " + stats.alreadyRotatable());
         lines.add("Ignored by default rules (dev, test, ore, fluid, metal blocks): " + stats.builtInIgnored());
@@ -85,7 +87,7 @@ public class RotatableCommand extends AbstractAsyncCommand {
         @Nonnull
         @Override
         protected CompletableFuture<Void> executeAsync(@Nonnull CommandContext context) {
-            reply(context, MOD + "  Block count", statLines(manager.getStats()));
+            reply(context, MOD + " - Block count", statLines(manager.getStats()));
             return CompletableFuture.completedFuture(null);
         }
     }
@@ -107,10 +109,10 @@ public class RotatableCommand extends AbstractAsyncCommand {
         protected CompletableFuture<Void> executeAsync(@Nonnull CommandContext context) {
             try {
                 manager.reload();
-                reply(context, MOD + "  Config reloaded", List.of());
+                reply(context, MOD + " - Config reloaded", List.of());
             } catch (Exception e) {
                 LOG.atSevere().withCause(e).log("Rotatable!: reload failed");
-                reply(context, MOD + "  Reload failed", List.of(
+                reply(context, MOD + " - Reload failed", List.of(
                         String.valueOf(e.getMessage()),
                         "See the server log for details."));
             }
@@ -137,15 +139,38 @@ public class RotatableCommand extends AbstractAsyncCommand {
         protected CompletableFuture<Void> executeAsync(@Nonnull CommandContext context) {
             try {
                 manager.writeDebugFile(version(plugin));
-                reply(context, MOD + "  Debug file written", List.of(
+                reply(context, MOD + " - Debug file written", List.of(
                         "Saved as debug.txt in the Rotatable! folder inside the mods folder.",
                         "It lists changed, ignored, blocked and skipped block ids."));
             } catch (Exception e) {
                 LOG.atSevere().withCause(e).log("Rotatable!: could not write the debug file");
-                reply(context, MOD + "  Debug file failed", List.of(
+                reply(context, MOD + " - Debug file failed", List.of(
                         String.valueOf(e.getMessage()),
                         "See the server log for details."));
             }
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    // ------------------------------------------------------------ /ra trace
+
+    /** Test tool, server operators only. */
+    private static final class TraceCommand extends AbstractAsyncCommand {
+
+        private final markaabo.rotatable.PlacementHandler trace;
+
+        TraceCommand(markaabo.rotatable.PlacementHandler trace) {
+            super("trace", "Test tool: logs block placement packets to the server log (toggle)");
+            this.trace = trace;
+        }
+
+        @Nonnull
+        @Override
+        protected CompletableFuture<Void> executeAsync(@Nonnull CommandContext context) {
+            boolean on = trace.toggleTrace();
+            reply(context, MOD + " - Trace " + (on ? "on" : "off"), List.of(
+                    on ? "Block placements are now saved to trace.txt in the Rotatable! folder."
+                            : "Block placement logging is off. Send trace.txt."));
             return CompletableFuture.completedFuture(null);
         }
     }
