@@ -21,8 +21,7 @@ public class RotatableCommand extends AbstractAsyncCommand {
 
     private final RotatablePlugin plugin;
 
-    public RotatableCommand(RotatablePlugin plugin, BlockRotationManager manager,
-                            markaabo.rotatable.PlacementHandler trace) {
+    public RotatableCommand(RotatablePlugin plugin, BlockRotationManager manager) {
         super("rotatable", "Shows the " + MOD + " version (subcommands: count, reload, debug)");
         this.plugin = plugin;
         addAliases("ra");
@@ -30,7 +29,6 @@ public class RotatableCommand extends AbstractAsyncCommand {
         addSubCommand(new CountCommand(manager));
         addSubCommand(new ReloadCommand(manager));
         addSubCommand(new DebugCommand(plugin, manager));
-        addSubCommand(new TraceCommand(trace));
     }
 
     @Nonnull
@@ -66,7 +64,7 @@ public class RotatableCommand extends AbstractAsyncCommand {
                 + " (" + stats.fromIncluded() + " from IncludedBlocks)");
         lines.add("Already rotatable in the base game: " + stats.alreadyRotatable());
         lines.add("Ignored by default rules (dev, test, ore, fluid, metal blocks): " + stats.builtInIgnored());
-        lines.add("Blocked by BlacklistedBlocks: " + stats.blacklisted());
+        lines.add("Excluded by ExcludedBlocks: " + stats.excluded());
         lines.add("Other-mod blocks skipped: " + stats.moddedSkipped()
                 + " (AutoDetectModdedBlocks is " + (stats.autoDetectModded() ? "on" : "off") + ")");
         return lines;
@@ -148,29 +146,6 @@ public class RotatableCommand extends AbstractAsyncCommand {
                         String.valueOf(e.getMessage()),
                         "See the server log for details."));
             }
-            return CompletableFuture.completedFuture(null);
-        }
-    }
-
-    // ------------------------------------------------------------ /ra trace
-
-    /** Test tool, server operators only. */
-    private static final class TraceCommand extends AbstractAsyncCommand {
-
-        private final markaabo.rotatable.PlacementHandler trace;
-
-        TraceCommand(markaabo.rotatable.PlacementHandler trace) {
-            super("trace", "Test tool: logs block placement packets to the server log (toggle)");
-            this.trace = trace;
-        }
-
-        @Nonnull
-        @Override
-        protected CompletableFuture<Void> executeAsync(@Nonnull CommandContext context) {
-            boolean on = trace.toggleTrace();
-            reply(context, MOD + " - Trace " + (on ? "on" : "off"), List.of(
-                    on ? "Block placements are now saved to trace.txt in the Rotatable! folder."
-                            : "Block placement logging is off. Send trace.txt."));
             return CompletableFuture.completedFuture(null);
         }
     }

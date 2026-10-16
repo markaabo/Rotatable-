@@ -4,11 +4,18 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 
-/** The settings stored in mods/Rotatable!/config.json. */
+/** The settings stored in mods/Rotatable!/config.json. The text of the file is in templates/ConfigTemplate. */
 public class RotatableConfig {
+
+    /** Raise this when the config layout changes in a way old files cannot be read. */
+    public static final int CURRENT_VERSION = 1;
 
     public static final BuilderCodec<RotatableConfig> CODEC = BuilderCodec
             .builder(RotatableConfig.class, RotatableConfig::new)
+            .append(new KeyedCodec<Integer>("ConfigVersion", Codec.INTEGER),
+                    (config, value) -> config.configVersion = value,
+                    config -> config.configVersion)
+            .add()
             .append(new KeyedCodec<Boolean>("AutoDetectFullBlocks", Codec.BOOLEAN),
                     (config, value) -> config.autoDetectFullBlocks = value,
                     config -> config.autoDetectFullBlocks)
@@ -21,26 +28,32 @@ public class RotatableConfig {
                     (config, value) -> config.rotationVariant = value,
                     config -> config.rotationVariant)
             .add()
-            .append(new KeyedCodec<String>("PlacementRotationMode", Codec.STRING),
-                    (config, value) -> config.placementRotationMode = value,
-                    config -> config.placementRotationMode)
+            .append(new KeyedCodec<Boolean>("CardinalPlacement", Codec.BOOLEAN),
+                    (config, value) -> config.cardinalPlacement = value,
+                    config -> config.cardinalPlacement)
             .add()
             .append(new KeyedCodec<String[]>("IncludedBlocks", Codec.STRING_ARRAY),
                     (config, value) -> config.includedBlocks = value,
                     config -> config.includedBlocks)
             .add()
-            .append(new KeyedCodec<String[]>("BlacklistedBlocks", Codec.STRING_ARRAY),
-                    (config, value) -> config.blacklistedBlocks = value,
-                    config -> config.blacklistedBlocks)
+            .append(new KeyedCodec<String[]>("ExcludedBlocks", Codec.STRING_ARRAY),
+                    (config, value) -> config.excludedBlocks = value,
+                    config -> config.excludedBlocks)
             .add()
             .build();
 
+    // A file without ConfigVersion counts as version 0 (an old file).
+    private int configVersion = 0;
     private boolean autoDetectFullBlocks = true;
     private boolean autoDetectModdedBlocks = false;
     private String rotationVariant = "NESW";
-    private String placementRotationMode = "Keep";
+    private boolean cardinalPlacement = false;
     private String[] includedBlocks = new String[0];
-    private String[] blacklistedBlocks = new String[0];
+    private String[] excludedBlocks = new String[0];
+
+    public int getConfigVersion() {
+        return configVersion;
+    }
 
     public boolean isAutoDetectFullBlocks() {
         return autoDetectFullBlocks;
@@ -54,15 +67,15 @@ public class RotatableConfig {
         return rotationVariant == null ? "NESW" : rotationVariant;
     }
 
-    public String getPlacementRotationMode() {
-        return placementRotationMode == null ? "Keep" : placementRotationMode;
+    public boolean isCardinalPlacement() {
+        return cardinalPlacement;
     }
 
     public String[] getIncludedBlocks() {
         return includedBlocks == null ? new String[0] : includedBlocks;
     }
 
-    public String[] getBlacklistedBlocks() {
-        return blacklistedBlocks == null ? new String[0] : blacklistedBlocks;
+    public String[] getExcludedBlocks() {
+        return excludedBlocks == null ? new String[0] : excludedBlocks;
     }
 }

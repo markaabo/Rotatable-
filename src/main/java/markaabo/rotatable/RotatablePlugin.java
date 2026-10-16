@@ -17,7 +17,7 @@ public class RotatablePlugin extends JavaPlugin {
 
     @Override
     protected void setup() {
-        getCommandRegistry().registerCommand(new RotatableCommand(this, rotationManager, placementHandler));
+        getCommandRegistry().registerCommand(new RotatableCommand(this, rotationManager));
         try {
             getEntityStoreRegistry().registerSystem(placementHandler);
         } catch (Exception e) {

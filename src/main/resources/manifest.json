@@ -1,8 +1,8 @@
 {
     "Group": "markaabo",
     "Name": "rotatable",
-    "Version": "0.0.5",
-    "Description": "Adds the option to rotate blocks in survival!",
+    "Version": "0.1.1",
+    "Description": "Decorate your world how you want to with the power of being able to rotate most* blocks in Adventure mode and finally be able to build inside prefabs without needing to redo all the blocks!",
     "Authors": [
         {
             "Name": "Mark Aabo"
@@ -20,6 +20,6 @@
     "ServerVersion": ">=0.7.0 <0.8.0",
     "Main": "markaabo.rotatable.RotatablePlugin",
     "UpdateChecker": {
-        "CurseForge": ""
+        "CurseForge": "1747001"
     }
 }

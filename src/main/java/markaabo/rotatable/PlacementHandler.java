@@ -11,51 +11,33 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
 import com.hypixel.hytale.server.core.event.events.ecs.PlaceBlockEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import org.joml.Vector3d;
 import org.joml.Vector3i;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 /**
- * Runs whenever a block is placed.
- *
- * 1. Placement fix: the game turns a rotatable block to face the player. For blocks that
- *    Rotatable! changed, this makes a plain placement come out unrotated. Pressing R still
- *    rotates the block one quarter turn per press, no matter which way the player faces.
- *    The game does not tell us whether R was pressed, so we work it out: the rotation the
- *    game picks for the player's facing is "no R". Any difference from that is R presses.
- * 2. Trace (/ra trace): writes every placement to mods/Rotatable!/trace.txt for testing.
+ * Runs whenever a block is placed. The game turns a rotatable block to face the player. For
+ * blocks that Rotatable! changed, this makes a plain placement come out unrotated. Pressing R
+ * still rotates the block one quarter turn per press, no matter which way the player faces.
+ * The game does not tell us whether R was pressed, so we work it out: the rotation the game
+ * picks for the player's facing is "no R". Any difference from that is R presses.
+ * Does nothing when the CardinalPlacement setting is on.
  */
 public final class PlacementHandler extends EntityEventSystem<EntityStore, PlaceBlockEvent> {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-    private static final Path TRACE_FILE = Path.of("mods", BlockRotationManager.MOD_NAME, "trace.txt");
+
+    /** How close to the line between two directions (in quarter turns; 0.15 is about 13 degrees) both count as plain. */
+    private static final double EDGE_TOLERANCE = 0.15;
 
     private final BlockRotationManager manager;
-    private volatile boolean tracing = false;
-    private int counter = 0;
+    private int loggedGeneration = -1;
 
     public PlacementHandler(BlockRotationManager manager) {
         super(PlaceBlockEvent.class);
         this.manager = manager;
-    }
-
-    /** Switches the trace on or off and returns the new state. */
-    public boolean toggleTrace() {
-        tracing = !tracing;
-        if (tracing) {
-            counter = 0;
-            writeTrace("Rotatable! placement trace, started " + LocalDateTime.now()
-                    + "  (each line = one placed block, numbered in order)", false);
-        }
-        return tracing;
     }
 
     @Override
@@ -65,40 +47,57 @@ public final class PlacementHandler extends EntityEventSystem<EntityStore, Place
                        @Nonnull CommandBuffer<EntityStore> commandBuffer,
                        @Nonnull PlaceBlockEvent event) {
         try {
-            Vector3i block = event.getTargetBlock();
-            RotationTuple original = event.getRotation();
             String itemId = itemId(event);
+            boolean cardinal = manager.isCardinalPlacement();
+            boolean ours = itemId != null && manager.isChanged(itemId);
+
+            // One log line after every reload, to show what the handler decided.
+            int generation = manager.generation();
+            if (generation != loggedGeneration) {
+                loggedGeneration = generation;
+                LOGGER.atInfo().log("Rotatable!: first placement after reload #%d: item=%s, rotation added=%s, "
+                        + "CardinalPlacement=%s", generation, itemId, ours, cardinal);
+            }
+
+            if (cardinal) {
+                return;
+            }
+            if (!ours) {
+                return; // not one of our blocks
+            }
+            HeadRotation head = archetypeChunk.getComponent(index, HeadRotation.getComponentType());
+            if (head == null) {
+                return;
+            }
 
             // Which way is the player facing? 0 = north, 1 = west, 2 = south, 3 = east.
-            int facing = -1;
-            String facingText = "unknown";
-            HeadRotation head = archetypeChunk.getComponent(index, HeadRotation.getComponentType());
-            if (head != null) {
+            // Close to the line between two directions the game and the server may disagree
+            // by a tiny turn, so both directions count as "no R pressed" there.
+            Vector3d look = head.getDirection();
+            int facing;
+            int adjacent;
+            if (Math.abs(look.x) + Math.abs(look.z) < 0.0001) {
+                // looking straight up or down: use the plain direction
                 Vector3i dir = head.getHorizontalAxisDirection();
                 facing = facingNumber(dir.x, dir.z);
-                facingText = "dir=(x " + dir.x + ", z " + dir.z + ")";
+                adjacent = facing;
+            } else {
+                double steps = Math.atan2(-look.x, -look.z) / (Math.PI / 2); // north 0, west 1, south 2 or -2, east -1
+                long nearest = Math.round(steps);
+                facing = Math.floorMod((int) nearest, 4);
+                boolean nearEdge = Math.abs(steps - nearest) > 0.5 - EDGE_TOLERANCE;
+                adjacent = nearEdge ? Math.floorMod((int) nearest + (steps > nearest ? 1 : -1), 4) : facing;
+            }
+            if (facing < 0) {
+                return;
             }
 
-            String result = "left alone";
-            if (facing >= 0 && itemId != null && manager.isChanged(itemId)) {
-                var turns = original.yaw().getDeclaringClass().getEnumConstants(); // None, 90, 180, 270
-                int current = original.yaw().ordinal();
-                int rPresses = Math.floorMod(current - facing, 4); // 0 = plain placement
-                if (rPresses != current) {
-                    event.setRotation(RotationTuple.of(turns[rPresses], original.pitch(), original.roll()));
-                    result = "changed to yaw=" + turns[rPresses];
-                } else {
-                    result = "already right";
-                }
-            }
-
-            if (tracing) {
-                writeTrace("#" + (++counter) + "  " + LocalTime.now().withNano(0)
-                        + "  item=" + itemId
-                        + "  facing: " + facingText
-                        + "  block=(" + block.x + ", " + block.y + ", " + block.z + ")"
-                        + "  game rotation: yaw=" + original.yaw()
-                        + "  -> " + result, true);
+            RotationTuple original = event.getRotation();
+            var turns = original.yaw().getDeclaringClass().getEnumConstants(); // None, 90, 180, 270
+            int current = original.yaw().ordinal();
+            int rPresses = current == adjacent ? 0 : Math.floorMod(current - facing, 4); // 0 = plain placement
+            if (rPresses != current) {
+                event.setRotation(RotationTuple.of(turns[rPresses], original.pitch(), original.roll()));
             }
         } catch (RuntimeException e) {
             LOGGER.atWarning().withCause(e).log("Rotatable!: could not handle a block placement");
@@ -143,19 +142,5 @@ public final class PlacementHandler extends EntityEventSystem<EntityStore, Place
         start += 7;
         int end = text.indexOf(',', start);
         return text.substring(start, end > start ? end : text.length()).trim();
-    }
-
-    private static synchronized void writeTrace(String line, boolean append) {
-        try {
-            Files.createDirectories(TRACE_FILE.getParent());
-            if (append) {
-                Files.writeString(TRACE_FILE, line + System.lineSeparator(), StandardCharsets.UTF_8,
-                        StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            } else {
-                Files.writeString(TRACE_FILE, line + System.lineSeparator(), StandardCharsets.UTF_8);
-            }
-        } catch (IOException e) {
-            LOGGER.atWarning().withCause(e).log("Rotatable!: could not write the trace file");
-        }
     }
 }
