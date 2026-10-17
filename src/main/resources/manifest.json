@@ -1,14 +1,14 @@
 {
     "Group": "markaabo",
     "Name": "rotatable",
-    "Version": "0.1.1",
+    "Version": "0.1.2",
     "Description": "Decorate your world how you want to with the power of being able to rotate most* blocks in Adventure mode and finally be able to build inside prefabs without needing to redo all the blocks!",
     "Authors": [
         {
             "Name": "Mark Aabo"
         }
     ],
-    "Website": "",
+    "Website": "https://www.curseforge.com/hytale/mods/rotatable",
     "DisabledByDefault": false,
     "IncludesAssetPack": false,
     "Dependencies": {
