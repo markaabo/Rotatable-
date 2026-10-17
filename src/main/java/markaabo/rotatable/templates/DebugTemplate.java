@@ -71,6 +71,7 @@ public final class DebugTemplate {
     static final String SUMMARY_GIVEN = "Blocks given rotation by Rotatable!: %d";
     static final String SUMMARY_ALREADY = "Already rotatable in the base game: %d";
     static final String SUMMARY_DEFAULT_RULES = "Ignored by the default rules: %d";
+    static final String SUMMARY_RELOADS = "Reloads (/ra reload) since the server started: %d";
 
     // Block sections. The number of blocks is added after each title, like "Title (12)".
     static final String AUTO_TITLE = "Given rotation by Rotatable!: full blocks found by auto-detect";
@@ -119,7 +120,7 @@ public final class DebugTemplate {
     }
 
     public record Data(String version, BlockRotationManager.Stats stats, BlockRotationManager.Report report,
-                       List<Setting> settings, List<String> rotationSets) {
+                       List<Setting> settings, List<String> rotationSets, int reloads) {
     }
 
     // =====================================================================================
@@ -161,6 +162,7 @@ public final class DebugTemplate {
                 lines.add(INDENT + String.format(SUMMARY_GIVEN, stats.rotationAdded()));
                 lines.add(INDENT + String.format(SUMMARY_ALREADY, stats.alreadyRotatable()));
                 lines.add(INDENT + String.format(SUMMARY_DEFAULT_RULES, stats.builtInIgnored()));
+                lines.add(INDENT + String.format(SUMMARY_RELOADS, data.reloads()));
             }
             case AUTO -> addBlockList(lines, AUTO_TITLE, report.auto());
             case INCLUDED -> addBlockList(lines, INCLUDED_TITLE, report.included());

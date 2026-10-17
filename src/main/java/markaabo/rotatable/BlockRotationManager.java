@@ -94,7 +94,7 @@ public final class BlockRotationManager {
     private record Change(String id, BlockType original, BlockType replacement, boolean restore) {
     }
 
-    private final Field rotationField = findFieldByType(BlockType.class, VariantRotation.class);
+    private final Field rotationField = findRotationField();
 
     private volatile RotatableConfig current = new RotatableConfig();
 
@@ -342,8 +342,13 @@ public final class BlockRotationManager {
         Map<String, List<Change>> byPack = new LinkedHashMap<>();
         for (Change change : changes) {
             String pack = assetMap.getAssetPack(change.id());
-            byPack.computeIfAbsent(pack != null ? pack : FALLBACK_PACK, key -> new ArrayList<>())
-                    .add(change);
+            String packKey = pack != null ? pack : FALLBACK_PACK;
+            List<Change> group = byPack.get(packKey);
+            if (group == null) {
+                group = new ArrayList<>();
+                byPack.put(packKey, group);
+            }
+            group.add(change);
         }
 
         boolean allOk = true;
@@ -480,7 +485,7 @@ public final class BlockRotationManager {
     public synchronized void writeDebugFile(String version) throws IOException {
         Files.createDirectories(CONFIG_DIRECTORY);
         List<String> lines = DebugTemplate.build(new DebugTemplate.Data(
-                version, stats, report, collectSettings(), rotationSetLines()));
+                version, stats, report, collectSettings(), rotationSetLines(), Math.max(0, generation() - 1)));
         Files.write(DEBUG_FILE, lines, StandardCharsets.UTF_8);
     }
 
@@ -613,17 +618,17 @@ public final class BlockRotationManager {
         return false;
     }
 
-    /** Finds a private field by its type (not its name), so game updates that rename it don't break us. */
-    private static Field findFieldByType(Class<?> owner, Class<?> type) {
+    /** Finds the rotation field of BlockType by its type (not its name), so game updates that rename it don't break us. */
+    private static Field findRotationField() {
         try {
-            for (Field field : owner.getDeclaredFields()) {
-                if (field.getType() == type && !Modifier.isStatic(field.getModifiers())) {
+            for (Field field : BlockType.class.getDeclaredFields()) {
+                if (field.getType() == VariantRotation.class && !Modifier.isStatic(field.getModifiers())) {
                     field.setAccessible(true);
                     return field;
                 }
             }
         } catch (RuntimeException e) {
-            LOGGER.atSevere().withCause(e).log("Rotatable!: reflection on %s failed", owner.getSimpleName());
+            LOGGER.atSevere().withCause(e).log("Rotatable!: reflection on BlockType failed");
         }
         return null;
     }
